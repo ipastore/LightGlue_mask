@@ -146,7 +146,7 @@ class Extractor(torch.nn.Module):
         feats["keypoints"] = (feats["keypoints"] + 0.5) / scales[None] - 0.5
         return feats
 
-
+# TODO: Add the ability to insert a mask to avoid features to match
 def match_pair(
     extractor,
     matcher,
@@ -158,6 +158,9 @@ def match_pair(
     """Match a pair of images (image0, image1) with an extractor and matcher"""
     feats0 = extractor.extract(image0, **preprocess)
     feats1 = extractor.extract(image1, **preprocess)
+
+    #TODO: Filter here with the mask
+    
     matches01 = matcher({"image0": feats0, "image1": feats1})
     data = [feats0, feats1, matches01]
     # remove batch dim and move to target device
