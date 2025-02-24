@@ -8,6 +8,8 @@ import kornia
 import numpy as np
 import torch
 
+from specular_mask import filter_feats_by_mask, get_mask_points
+
 
 class ImagePreprocessor:
     default_conf = {
@@ -146,21 +148,43 @@ class Extractor(torch.nn.Module):
         feats["keypoints"] = (feats["keypoints"] + 0.5) / scales[None] - 0.5
         return feats
 
-# TODO: Add the ability to insert a mask to avoid features to match
+
 def match_pair(
     extractor,
     matcher,
     image0: torch.Tensor,
     image1: torch.Tensor,
     device: str = "cpu",
+    mask0: torch.Tensor = None,
+    mask1: torch.Tensor = None,
     **preprocess,
 ):
     """Match a pair of images (image0, image1) with an extractor and matcher"""
     feats0 = extractor.extract(image0, **preprocess)
     feats1 = extractor.extract(image1, **preprocess)
 
-    #TODO: Filter here with the mask
-    
+    if mask0 is not None:
+        mask0_points = get_mask_points(mask0)
+       
+        #TODO: filter also descriptors?       
+        #### DEBUG ####
+        feats0_copy = feats0.copy()
+        feats0["keypoints"], feats0['descriptors'] = filter_feats_by_mask(feats0["keypoints"], feats0["descriptors"],mask0_points)
+        #pritn amount of keypints filtered
+        print(f'Filtered {feats0_copy["keypoints"].shape[1] - feats0["keypoints"].shape[1]} keypoints from image 0')
+        #### DEBUG ####
+
+    if mask1 is not None:
+        mask1_points = get_mask_points(mask1)
+        
+        #### DEBUG ####
+        feats1_copy = feats1.copy()
+        feats1["keypoints"], feats1['descriptors'] = filter_feats_by_mask(feats1["keypoints"], feats1["descriptors"],mask1_points)
+        #pritn amount of keypints filtered
+        print(f'Filtered {feats1_copy["keypoints"].shape[1] - feats1["keypoints"].shape[1]} keypoints from image 1')
+        #### DEBUG ####
+
+
     matches01 = matcher({"image0": feats0, "image1": feats1})
     data = [feats0, feats1, matches01]
     # remove batch dim and move to target device
