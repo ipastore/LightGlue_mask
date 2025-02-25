@@ -160,13 +160,15 @@ def match_pair(
     **preprocess,
 ):
     """Match a pair of images (image0, image1) with an extractor and matcher"""
+    
     feats0 = extractor.extract(image0, **preprocess)
     feats1 = extractor.extract(image1, **preprocess)
 
+    #TODO: resize mask0 and mask1 if needed.
     if mask0 is not None:
+        assert image0.shape[-2:] == mask0.shape[-2:]
         mask0_points = get_mask_points(mask0)
        
-        #TODO: filter also descriptors?       
         #### DEBUG ####
         feats0_copy = feats0.copy()
         feats0["keypoints"], feats0['descriptors'] = filter_feats_by_mask(feats0["keypoints"], feats0["descriptors"],mask0_points)
@@ -175,6 +177,7 @@ def match_pair(
         #### DEBUG ####
 
     if mask1 is not None:
+        assert image1.shape[-2:] == mask1.shape[-2:]
         mask1_points = get_mask_points(mask1)
         
         #### DEBUG ####
