@@ -7,8 +7,9 @@ import cv2
 import kornia
 import numpy as np
 import torch
+import logging
 
-from specular_mask import filter_feats_by_mask, get_mask_points
+from specular_mask import filter_image_feats_with_mask
 
 
 class ImagePreprocessor:
@@ -157,37 +158,25 @@ def match_pair(
     device: str = "cpu",
     mask0: torch.Tensor = None,
     mask1: torch.Tensor = None,
+    logger: logging.Logger = None,
     **preprocess,
 ):
     """Match a pair of images (image0, image1) with an extractor and matcher"""
     
     feats0 = extractor.extract(image0, **preprocess)
     feats1 = extractor.extract(image1, **preprocess)
-
-    #TODO: resize mask0 and mask1 if needed.
+    
     if mask0 is not None:
-        assert image0.shape[-2:] == mask0.shape[-2:]
-        mask0_points = get_mask_points(mask0)
-       
-        #### DEBUG ####
-        feats0_copy = feats0.copy()
-        feats0["keypoints"], feats0['descriptors'] = filter_feats_by_mask(feats0["keypoints"], feats0["descriptors"],mask0_points)
-        #pritn amount of keypints filtered
-        print(f'Filtered {feats0_copy["keypoints"].shape[1] - feats0["keypoints"].shape[1]} keypoints from image 0')
-        #### DEBUG ####
+        feats0["keypoints"], feats0['descriptors'] = filter_image_feats_with_mask(image0, mask0,feats0["keypoints"], feats0["descriptors"],logger)
 
     if mask1 is not None:
-        assert image1.shape[-2:] == mask1.shape[-2:]
-        mask1_points = get_mask_points(mask1)
-        
-        #### DEBUG ####
-        feats1_copy = feats1.copy()
-        feats1["keypoints"], feats1['descriptors'] = filter_feats_by_mask(feats1["keypoints"], feats1["descriptors"],mask1_points)
-        #pritn amount of keypints filtered
-        print(f'Filtered {feats1_copy["keypoints"].shape[1] - feats1["keypoints"].shape[1]} keypoints from image 1')
-        #### DEBUG ####
+        feats1["keypoints"], feats1['descriptors'] = filter_image_feats_with_mask(image1, mask1,feats1["keypoints"], feats1["descriptors"],logger)
 
-
+    # # Log and return if no keypoints left afetr filtering
+    if len(feats0["keypoints"]) == 0 or len(feats1["keypoints"]) == 0:
+        logger.info("No keypoints left after filtering")
+        return [], [], [], 
+    
     matches01 = matcher({"image0": feats0, "image1": feats1})
     data = [feats0, feats1, matches01]
     # remove batch dim and move to target device
