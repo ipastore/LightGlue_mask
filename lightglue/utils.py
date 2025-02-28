@@ -9,7 +9,7 @@ import numpy as np
 import torch
 import logging
 
-from specular_mask import filter_image_feats_with_mask
+from specular_mask import filter_feat_dict_with_mask
 
 
 class ImagePreprocessor:
@@ -147,6 +147,7 @@ class Extractor(torch.nn.Module):
         feats = self.forward({"image": img})
         feats["image_size"] = torch.tensor(shape)[None].to(img).float()
         feats["keypoints"] = (feats["keypoints"] + 0.5) / scales[None] - 0.5
+        #TODO: shouldnt I be filtering the keypoints here?
         return feats
 
 
@@ -166,16 +167,17 @@ def match_pair(
     feats0 = extractor.extract(image0, **preprocess)
     feats1 = extractor.extract(image1, **preprocess)
     
+    #TODO: Filter all the feats positions keypoints, descriptors, keypoints_scores and in the case of sift scales and oris
     if mask0 is not None:
-        feats0["keypoints"], feats0['descriptors'] = filter_image_feats_with_mask(image0, mask0,feats0["keypoints"], feats0["descriptors"],logger)
+        feats0 = filter_feat_dict_with_mask(image0, mask0, feats0, logger)
 
     if mask1 is not None:
-        feats1["keypoints"], feats1['descriptors'] = filter_image_feats_with_mask(image1, mask1,feats1["keypoints"], feats1["descriptors"],logger)
-
+        feats1 = filter_feat_dict_with_mask(image1, mask1, feats1, logger)
+        
     # # Log and return if no keypoints left afetr filtering
     if len(feats0["keypoints"]) == 0 or len(feats1["keypoints"]) == 0:
         logger.info("No keypoints left after filtering")
-        return [], [], [], 
+        return [], [], [] 
     
     matches01 = matcher({"image0": feats0, "image1": feats1})
     data = [feats0, feats1, matches01]
