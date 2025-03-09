@@ -485,7 +485,6 @@ class LightGlue(nn.Module):
         kpts0 = normalize_keypoints(kpts0, size0).clone()
         kpts1 = normalize_keypoints(kpts1, size1).clone()
 
-        #TODO: fix for sift-lg
         if self.conf.add_scale_ori:
             kpts0 = torch.cat(
                 [kpts0] + [data0[k].unsqueeze(-1) for k in ("scales", "oris")], -1

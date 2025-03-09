@@ -8,6 +8,7 @@ import kornia
 import numpy as np
 import torch
 import logging
+import time
 
 from specular_mask import filter_feat_dict_with_mask
 
@@ -147,7 +148,6 @@ class Extractor(torch.nn.Module):
         feats = self.forward({"image": img})
         feats["image_size"] = torch.tensor(shape)[None].to(img).float()
         feats["keypoints"] = (feats["keypoints"] + 0.5) / scales[None] - 0.5
-        #TODO: shouldnt I be filtering the keypoints here?
         return feats
 
 
@@ -163,24 +163,37 @@ def match_pair(
     **preprocess,
 ):
     """Match a pair of images (image0, image1) with an extractor and matcher"""
-    
+    timings = {
+        "extractor_time": 0.0,
+        "filter_time": 0.0,
+        "matcher_time": 0.0,
+    }
+    start_extractor = time.perf_counter()    
     feats0 = extractor.extract(image0, **preprocess)
     feats1 = extractor.extract(image1, **preprocess)
-    
-    #TODO: Filter all the feats positions keypoints, descriptors, keypoints_scores and in the case of sift scales and oris
+    end_extractor = time.perf_counter()
+    timings["extractor_time"] = end_extractor - start_extractor
+
+    start_filter = time.perf_counter()
     if mask0 is not None:
         feats0 = filter_feat_dict_with_mask(image0, mask0, feats0, logger)
 
     if mask1 is not None:
         feats1 = filter_feat_dict_with_mask(image1, mask1, feats1, logger)
-        
+    end_filter = time.perf_counter()
+    timings["filter_time"] = end_filter - start_filter
+
     # # Log and return if no keypoints left afetr filtering
     if len(feats0["keypoints"]) == 0 or len(feats1["keypoints"]) == 0:
         logger.info("No keypoints left after filtering")
-        return [], [], [] 
+        return [], [], [], timings
     
+    start_matcher = time.perf_counter()
     matches01 = matcher({"image0": feats0, "image1": feats1})
+    end_matcher = time.perf_counter()
+    timings["matcher_time"] = end_matcher - start_matcher
+
     data = [feats0, feats1, matches01]
     # remove batch dim and move to target device
     feats0, feats1, matches01 = [batch_to_device(rbd(x), device) for x in data]
-    return feats0, feats1, matches01
+    return feats0, feats1, matches01, timings
