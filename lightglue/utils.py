@@ -7,6 +7,10 @@ import cv2
 import kornia
 import numpy as np
 import torch
+import logging
+import time
+
+from specular_mask import filter_feat_dict_with_mask
 
 
 class ImagePreprocessor:
@@ -153,13 +157,43 @@ def match_pair(
     image0: torch.Tensor,
     image1: torch.Tensor,
     device: str = "cpu",
+    mask0: torch.Tensor = None,
+    mask1: torch.Tensor = None,
+    logger: logging.Logger = None,
     **preprocess,
 ):
     """Match a pair of images (image0, image1) with an extractor and matcher"""
+    timings = {
+        "extractor_time": 0.0,
+        "filter_time": 0.0,
+        "matcher_time": 0.0,
+    }
+    start_extractor = time.perf_counter()    
     feats0 = extractor.extract(image0, **preprocess)
     feats1 = extractor.extract(image1, **preprocess)
+    end_extractor = time.perf_counter()
+    timings["extractor_time"] = end_extractor - start_extractor
+
+    start_filter = time.perf_counter()
+    if mask0 is not None:
+        feats0 = filter_feat_dict_with_mask(image0, mask0, feats0, logger)
+
+    if mask1 is not None:
+        feats1 = filter_feat_dict_with_mask(image1, mask1, feats1, logger)
+    end_filter = time.perf_counter()
+    timings["filter_time"] = end_filter - start_filter
+
+    # # Log and return if no keypoints left afetr filtering
+    if len(feats0["keypoints"]) == 0 or len(feats1["keypoints"]) == 0:
+        logger.info("No keypoints left after filtering")
+        return [], [], [], timings
+    
+    start_matcher = time.perf_counter()
     matches01 = matcher({"image0": feats0, "image1": feats1})
+    end_matcher = time.perf_counter()
+    timings["matcher_time"] = end_matcher - start_matcher
+
     data = [feats0, feats1, matches01]
     # remove batch dim and move to target device
     feats0, feats1, matches01 = [batch_to_device(rbd(x), device) for x in data]
-    return feats0, feats1, matches01
+    return feats0, feats1, matches01, timings

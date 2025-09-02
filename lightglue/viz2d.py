@@ -80,6 +80,9 @@ def plot_images(imgs, titles=None, cmaps="gray", dpi=100, pad=0.5, adaptive=True
             ax[i].set_title(titles[i])
     fig.tight_layout(pad=pad)
 
+    return fig, ax
+
+
 
 def plot_keypoints(kpts, colors="lime", ps=4, axes=None, a=1.0):
     """Plot keypoints for existing images.
